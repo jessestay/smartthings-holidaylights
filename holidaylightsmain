@@ -1,0 +1,233 @@
+/**
+ *  HolidayLights
+ *
+ *  Copyright 2016 jessestay
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License. You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+ *  for the specific language governing permissions and limitations under the License.
+ *  
+ *  This Smartthings app sets the colors of specified lights based on the current holiday. It leaves them as is
+ *  on non-holidays. You'll need to use another app to turn on and off the lights (or a light sensor).
+ *
+ *	I removed all calls to "defaultColor" - I don't want the colors to change at all (leaving it white) if it's not a holiday
+ *
+ */
+import java.util.Random 
+ 
+definition(
+    name: "HolidayLights",
+    namespace: "jessestay",
+    author: "jessestay",
+    description: "Turn an OSRAM color bulb colors to indicate current holiday.",
+    category: "Convenience",
+    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
+    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
+    iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+
+
+preferences {
+    section("Devices") {
+        input "thebulb", "capability.colorControl", title: "Pick a bulb", required: true, multiple: false
+    }
+    // section("Settings") {
+	//	input(name: "defaultColor", type: "number", title: "What Default Hue?", description: "0", required: true, defaultValue: 0)
+    // }
+    section("When...") {
+		input "setColorTime", "time", title: "Change colors at what time (on date colors change)?", required: true
+	}
+}
+
+def installed() {
+    schedule(setColorTime, "setHolidayColor")
+    subscribeToCommand(thebulb, "off", uponOffCommand)
+    state.colorToggle = 0
+    log.debug "Installed with settings: ${settings}"
+    thebulb.setSaturation(100)
+}
+
+def updated() {
+    unsubscribe()
+    unschedule()
+    schedule(setColorTime, "setHolidayColor")
+    subscribeToCommand(thebulb, "off", uponOffCommand)
+    state.colorToggle = 0
+    log.debug "Updated with settings: ${settings}"
+    thebulb.setSaturation(100)
+}
+
+def uponOffCommand(evt) {
+    log.debug "in onOffCommand"
+    
+    def time = now()
+    def dateInfo = new Date(time + location.timeZone.getOffset(time))
+    def thisHour = dateInfo.hours
+    def thisMinutes = dateInfo.minutes 
+    def currentTimeValue = thisHour.toInteger() * 60 + thisMinutes.toInteger()
+    log.debug "currentTimeValue: $currentTimeValue"
+    
+    def readyTime = timeToday(setColorTime, location.timeZone)
+    def readyHour = readyTime.format("H",location.timeZone)
+    def readyMinutes = readyTime.format("m",location.timeZone)
+    def endTimeValue = readyHour.toInteger() * 60 + readyMinutes.toInteger()
+    log.debug "endTimeValue: $endTimeValue"
+    
+    if (currentTimeValue >= endTimeValue) {
+		if(state.colorToggle == 0) {	// Toggle color back and forth every time it turns off
+	    	state.colorToggle = 1
+		} else {
+	    	state.colorToggle = 0
+		}
+		log.debug "state.colorToggleReady: $state.colorToggle"  
+
+		setHolidayColor()
+    }
+}
+
+def setHolidayColor() {
+    log.debug "in setHolidayColor"
+//  def defaultColor = 55  // Light Bluish
+    def todaysColor = null
+    
+    def	valentinesStartMonth = 2
+    def valentinesStartDate = 10
+    def valentinesColor = 89  // Pink
+    def	valentinesEndMonth = 2
+    def valentinesEndDate = 15
+    
+    def	stPatStartMonth = 3  // March
+    def stPatStartDate = 16
+    def stPatColor1 = 30 // Green
+    // def stPatColor2 = 30  // Dark Green
+    // def stPatColors = [stPatColor1,stPatColor2]
+    def	stPatEndMonth = 3
+    def stPatEndDate = 18  // April 17 - St Patricks Day
+    def stPatEndDateIndex = getDateIndex(stPatEndMonth,stPatEndDate)
+    def stPatStartDateIndex = getDateIndex(stPatStartMonth,stPatStartDate)
+    log.debug("stPatEndDateIndex: $stPatEndDateIndex")
+    log.debug("stPatStartDateIndex: $stPatStartDateIndex")
+    
+    def	easterStartMonth = 4  // April
+    def easterStartDate = 9
+    def easterColor1 = 6.5  // Yellow
+    def easterColor2 = 79  // Purple
+    def easterColors = [easterColor1,easterColor2]
+    def	easterEndMonth = 4
+    def easterEndDate = 17  // April 16 is Easter 2017
+    
+    def	indepStartMonth = 6  // June
+    def indepStartDate = 28
+    def indepColor1 = 66  // Blue
+    def indepColor2 = 0  // Red
+    def indepColors = [indepColor1,indepColor2]
+    def	indepEndMonth = 7  // July
+    def indepEndDate = 5  
+    
+    def	halloweenStartMonth = 10  // Oct
+    def halloweenStartDate = 1
+    def halloweenColor1 = 1.25  // Orange
+    def halloweenColor2 = 79  // Purple
+    def	halloweenEndMonth = 11  // Oct
+    def halloweenEndDate = 1
+    
+    def	tgivingStartMonth = 11  // Nov
+    def tgivingStartDate = 15
+    def tgivingColor = 6.5  // Yellow
+    def	tgivingEndMonth = 11  // Nov
+    def tgivingEndDate = 23  // Nov 24 is Thanksgiving 2016
+    
+    def	christmasStartMonth = 11  // Nov
+    def christmasStartDate = 24
+    def christmasColor1 = 0  // Red
+    def christmasColor2 = 33  // Green
+    def christmasColors = [christmasColor1,christmasColor2]
+    def	christmasEndMonth = 12  // Dec
+    def christmasEndDate = 31
+        
+    def time = now()
+    def dateInfo = new Date(time + location.timeZone.getOffset(time))
+    def thisMonth = dateInfo.month + 1  
+    def thisDate = dateInfo.date
+    log.debug "thisMonth: $thisMonth"
+    log.debug "thisDate: $thisDate"
+    
+    def todayIndex = getDateIndex(thisMonth, thisDate)
+    log.debug "todayIndex: $todayIndex"
+    
+    if (todayIndex >= getDateIndex(christmasEndMonth,christmasEndDate)) {
+    	// todaysColor = defaultColor
+    } else if (todayIndex >= getDateIndex(christmasStartMonth,christmasStartDate)) {
+    	todaysColor = getRandom(christmasColors)
+        // if(state.colorToggle == 0) {	// Toggle color back and forth every day
+    	//    todaysColor = christmasColor1
+        // } else {
+    	//    todaysColor = christmasColor2
+        // }
+    } else if (todayIndex >= getDateIndex(tgivingEndMonth,tgivingEndDate)) {
+	    // todaysColor = defaultColor
+    } else if (todayIndex >= getDateIndex(tgivingStartMonth,tgivingStartDate)) {
+	    todaysColor = tgivingColor
+    } else if (todayIndex >= getDateIndex(halloweenEndMonth,halloweenEndDate)) {
+	    // todaysColor = defaultColor
+    } else if (todayIndex >= getDateIndex(halloweenStartMonth,halloweenStartDate)) {
+    	todaysColor = getRandom(halloweenColors)
+        // if(state.colorToggle == 0) {	// Toggle color back and forth every day
+    		// todaysColor = halloweenColor1
+    	// } else {
+    		// todaysColor = halloweenColor2
+    	// }    
+    } else if (todayIndex >= getDateIndex(indepEndMonth,indepEndDate)) {
+	    // todaysColor = defaultColor    
+    } else if (todayIndex >= getDateIndex(indepStartMonth,indepStartDate)) {
+    	todaysColor = getRandom(indepColors)
+        // if(state.colorToggle == 0) {	// Toggle color back and forth every day
+    		// todaysColor = indepColor1
+    	// } else {
+    		// todaysColor = indepColor2
+    	// }        
+    } else if (todayIndex >= getDateIndex(easterEndMonth,easterEndDate)) {
+	    // todaysColor = defaultColor       
+    } else if (todayIndex >= getDateIndex(easterStartMonth,easterStartDate)) {
+    	todaysColor = getRandom(easterColors)
+        // if(state.colorToggle == 0) {	// Toggle color back and forth every day
+    	//	todaysColor = easterColor1
+    	//} else {
+    	//	todaysColor = easterColor2
+    	//}       
+    } else if (todayIndex >= getDateIndex(stPatEndMonth,stPatEndDate)) {
+	    // todaysColor = defaultColor       
+    } else if (todayIndex >= getDateIndex(stPatStartMonth,stPatStartDate)) {
+    	// todaysColor = getRandom(stPatColors)
+        todaysColor = stPatColor1
+    } else if (todayIndex >= getDateIndex(valentinesEndMonth,valentinesEndDate)) {
+	    // todaysColor = defaultColor        
+    } else if (todayIndex >= getDateIndex(valentinesStartMonth,valentinesStartDate)) {
+	    todaysColor = valentinesColor    
+    } else {
+        // todaysColor = defaultColor    
+    }
+    log.debug "todaysColor: $todaysColor"    
+
+	if (todaysColor != null) { // only set bulb color if it's a holiday - otherwise leave default hue color
+    	thebulb.setHue(todaysColor)
+    	thebulb.setSaturation(100)
+    }
+}
+
+def getDateIndex(inputMonth, inputDate) {
+//    log.debug "inputMonth: $inputMonth  inputDate: $inputDate" 
+    def result = (inputMonth-1) * 31 + inputDate	// Rough day of the year calc, wrong as all months dont have 31 days, but it doesn't matter
+    return result
+}
+
+def getRandom(array) {
+	log.debug("running getRandom...")
+    def rnd = new Random()
+    def i = rnd.nextInt(array.size())
+    return array[i]
+}
